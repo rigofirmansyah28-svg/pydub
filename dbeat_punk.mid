@@ -1,0 +1,93 @@
+from midiutil import MIDIFile
+import fluidsynth
+from pydub import AudioSegment
+
+# Konfigurasi dasar
+tempo = 200  # BPM
+volume = 100
+track = 0
+channel_guitar = 0
+channel_bass = 1
+channel_drums = 9
+
+# Buat MIDI object
+midi = MIDIFile(1)
+midi.addTempo(track, 0, tempo)
+
+# Helper: tambah chord (power chord)
+def add_chord(root, start, duration, channel):
+    chord = [root, root+7, root+12]  # root + fifth + octave
+    for note in chord:
+        midi.addNote(track, channel, note, start, duration, volume)
+
+# Helper: drum pattern D-beat (1 bar)
+def add_dbeat(start, bars=1):
+    for bar in range(bars):
+        t0 = start + bar*4
+        for i in range(8):  # hihat 8th
+            midi.addNote(track, channel_drums, 42, t0+i*0.5, 0.5, 80)
+        midi.addNote(track, channel_drums, 36, t0, 0.25, 100)   # kick
+        midi.addNote(track, channel_drums, 38, t0+1, 0.25, 110) # snare
+        midi.addNote(track, channel_drums, 36, t0+2, 0.25, 100) # kick
+        midi.addNote(track, channel_drums, 38, t0+3, 0.25, 110) # snare
+
+# Chord root (MIDI notes, low register)
+E2, D2, A2, B2, G2 = 40, 38, 45, 47, 43
+
+time = 0
+
+# Intro
+for root in [E2, D2, A2, B2]*2:
+    add_chord(root, time, 1, channel_guitar)
+    midi.addNote(track, channel_bass, root, time, 1, 90)
+    add_dbeat(time, 1)
+    time += 1
+
+# Verse
+for root in [E2, D2, A2, B2]*2:
+    add_chord(root, time, 1, channel_guitar)
+    midi.addNote(track, channel_bass, root, time, 1, 90)
+    add_dbeat(time, 1)
+    time += 1
+
+# Reff
+for root in [E2, B2, D2, A2]*2:
+    add_chord(root, time, 1, channel_guitar)
+    midi.addNote(track, channel_bass, root, time, 1, 90)
+    add_dbeat(time, 1)
+    time += 1
+
+# Bridge
+for root in [E2, D2, B2, A2]:
+    add_chord(root, time, 1, channel_guitar)
+    midi.addNote(track, channel_bass, root, time, 1, 90)
+    add_dbeat(time, 1)
+    time += 1
+
+# Outro
+for root in [E2, B2, D2, A2]*2:
+    add_chord(root, time, 1, channel_guitar)
+    midi.addNote(track, channel_bass, root, time, 1, 90)
+    add_dbeat(time, 1)
+    time += 1
+
+# Simpan MIDI sementara
+with open("dbeat_punk.mid", "wb") as f:
+    midi.writeFile(f)
+
+# Render ke WAV
+sf2_path = "GeneralUser GS.sf2"  # ganti path soundfont lo
+fs = fluidsynth.Synth()
+fs.start(driver="file", filename="dbeat_punk_demo.wav")
+sfid = fs.sfload(sf2_path)
+fs.program_select(0, sfid, 0, 30)  # Distortion Guitar
+fs.program_select(1, sfid, 0, 34)  # Electric Bass
+fs.program_select(9, sfid, 0, 0)   # Drum kit
+fs.play_midi("dbeat_punk.mid")
+fs.delete()
+
+# Convert WAV ke MP3
+sound = AudioSegment.from_wav("dbeat_punk_demo.wav")
+sound.export("dbeat_punk_demo.mp3", format="mp3")
+
+print("✅ Selesai! File: dbeat_punk_demo.mp3")
